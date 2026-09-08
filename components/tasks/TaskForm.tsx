@@ -1,0 +1,14 @@
+"use client";
+
+import { FormEvent, useState } from "react";
+import type { Task } from "../../lib/domain/types";
+type Fields = { title: string; dueDate: string; priority: string; tag: string; estimatedMinutes: string; status: "todo" | "in_progress"; blockedReason: string };
+const blank: Fields = { title: "", dueDate: "", priority: "3", tag: "", estimatedMinutes: "0", status: "todo", blockedReason: "" };
+const fromTask = (task: Task): Fields => ({ title: task.title, dueDate: task.dueDate ?? "", priority: String(task.priority), tag: task.tag, estimatedMinutes: String(task.estimatedMinutes), status: task.status === "done" ? "in_progress" : task.status, blockedReason: task.blockedReason ?? "" });
+
+export function TaskForm({ planId, task, onSave, onError }: { planId: string; task?: Task; onSave: () => Promise<void>; onError: () => void }) {
+  const [fields, setFields] = useState(task ? fromTask(task) : blank); const [saving, setSaving] = useState(false);
+  const set = (key: keyof Fields, value: string) => setFields((old) => ({ ...old, [key]: value }));
+  const submit = async (event: FormEvent) => { event.preventDefault(); setSaving(true); try { const payload = { ...fields, dueDate: fields.dueDate || null, blockedReason: fields.blockedReason || null, priority: Number(fields.priority), estimatedMinutes: Number(fields.estimatedMinutes) }; const response = await fetch(task ? `/api/tasks/${task.id}` : "/api/tasks", { method: task ? "PATCH" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(task ? payload : { ...payload, planId }) }); if (!response.ok) throw new Error("task request failed"); await onSave(); if (!task) setFields(blank); } catch { onError(); } finally { setSaving(false); } };
+  return <form className="form-grid" onSubmit={submit} aria-label={task ? "할 일 수정 양식" : "새 할 일 양식"}><label>할 일 제목<input value={fields.title} onChange={(e) => set("title", e.target.value)} required /></label><label>마감일<input type="date" value={fields.dueDate} onChange={(e) => set("dueDate", e.target.value)} /></label><label>우선순위<input type="number" min="1" max="5" value={fields.priority} onChange={(e) => set("priority", e.target.value)} required /></label><label>태그<input value={fields.tag} onChange={(e) => set("tag", e.target.value)} required /></label><label>예상 시간(분)<input type="number" min="0" value={fields.estimatedMinutes} onChange={(e) => set("estimatedMinutes", e.target.value)} required /></label><label>상태<select value={fields.status} onChange={(e) => set("status", e.target.value as Fields["status"])}><option value="todo">할 일</option><option value="in_progress">진행 중</option></select></label><label>막힘 사유<textarea value={fields.blockedReason} onChange={(e) => set("blockedReason", e.target.value)} /></label><button className="primary" type="submit" disabled={saving}>{saving ? "저장 중" : task ? "할 일 저장" : "할 일 추가"}</button></form>;
+}

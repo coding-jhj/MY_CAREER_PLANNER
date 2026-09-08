@@ -1,0 +1,138 @@
+{
+  "schemaVersion": "pds-schema-v2",
+  "timezone": "Asia/Seoul",
+  "tables": [
+    "workspaces",
+    "plans",
+    "plan_revisions",
+    "tasks",
+    "execution_records",
+    "reviews"
+  ],
+  "relations": [
+    "workspaces 1:N plans",
+    "plans 1:N plan_revisions",
+    "plans 1:N tasks",
+    "tasks 1:N execution_records",
+    "plans 1:N reviews",
+    "reviews 0:1 plans(next_plan_id)"
+  ],
+  "tableDefinitions": {
+    "workspaces": {
+      "fields": {
+        "id": { "type": "uuid", "nullable": false, "primaryKey": true },
+        "slug": { "type": "text", "nullable": false, "unique": true },
+        "title": { "type": "text", "nullable": false },
+        "timezone": { "type": "text", "nullable": false, "default": "Asia/Seoul" },
+        "created_at": { "type": "timestamptz", "nullable": false }
+      }
+    },
+    "plans": {
+      "fields": {
+        "id": { "type": "uuid", "nullable": false, "primaryKey": true },
+        "workspace_id": { "type": "uuid", "nullable": false, "references": "workspaces.id" },
+        "title": { "type": "text", "nullable": false },
+        "start_date": { "type": "date", "nullable": false },
+        "end_date": { "type": "date", "nullable": false },
+        "priority": { "type": "integer", "nullable": false, "range": [1, 5] },
+        "success_criteria": { "type": "text", "nullable": false },
+        "estimated_minutes": { "type": "integer", "nullable": false, "minimum": 0 },
+        "created_at": { "type": "timestamptz", "nullable": false },
+        "updated_at": { "type": "timestamptz", "nullable": false },
+        "archived_at": { "type": "timestamptz", "nullable": true }
+      },
+      "constraints": ["end_date >= start_date"]
+    },
+    "plan_revisions": {
+      "fields": {
+        "id": { "type": "uuid", "nullable": false, "primaryKey": true },
+        "plan_id": { "type": "uuid", "nullable": false, "references": "plans.id" },
+        "revision_no": { "type": "integer", "nullable": false },
+        "title": { "type": "text", "nullable": false },
+        "start_date": { "type": "date", "nullable": false },
+        "end_date": { "type": "date", "nullable": false },
+        "priority": { "type": "integer", "nullable": false, "range": [1, 5] },
+        "success_criteria": { "type": "text", "nullable": false },
+        "estimated_minutes": { "type": "integer", "nullable": false, "minimum": 0 },
+        "saved_at": { "type": "timestamptz", "nullable": false }
+      },
+      "constraints": ["unique(plan_id, revision_no)", "end_date >= start_date"]
+    },
+    "tasks": {
+      "fields": {
+        "id": { "type": "uuid", "nullable": false, "primaryKey": true },
+        "plan_id": { "type": "uuid", "nullable": false, "references": "plans.id" },
+        "title": { "type": "text", "nullable": false },
+        "due_date": { "type": "date", "nullable": true },
+        "priority": { "type": "integer", "nullable": false, "range": [1, 5] },
+        "tag": { "type": "text", "nullable": false },
+        "estimated_minutes": { "type": "integer", "nullable": false, "minimum": 0 },
+        "status": { "type": "text", "nullable": false, "values": ["todo", "in_progress", "done"], "default": "todo" },
+        "blocked_reason": { "type": "text", "nullable": true },
+        "completed_at": { "type": "timestamptz", "nullable": true },
+        "deleted_at": { "type": "timestamptz", "nullable": true, "softDelete": true },
+        "created_at": { "type": "timestamptz", "nullable": false },
+        "updated_at": { "type": "timestamptz", "nullable": false }
+      }
+    },
+    "execution_records": {
+      "fields": {
+        "id": { "type": "uuid", "nullable": false, "primaryKey": true },
+        "task_id": { "type": "uuid", "nullable": false, "references": "tasks.id" },
+        "started_at": { "type": "timestamptz", "nullable": false },
+        "ended_at": { "type": "timestamptz", "nullable": false },
+        "actual_minutes": { "type": "integer", "nullable": false, "minimum": 0, "calculatedFrom": "ended_at - started_at" },
+        "missed_reason": { "type": "text", "nullable": true },
+        "idempotency_key": { "type": "uuid", "nullable": false, "unique": true },
+        "created_at": { "type": "timestamptz", "nullable": false }
+      },
+      "constraints": ["ended_at >= started_at"]
+    },
+    "reviews": {
+      "fields": {
+        "id": { "type": "uuid", "nullable": false, "primaryKey": true },
+        "plan_id": { "type": "uuid", "nullable": false, "references": "plans.id" },
+        "correction_text": { "type": "text", "nullable": false },
+        "next_plan_id": { "type": "uuid", "nullable": true, "references": "plans.id" },
+        "created_at": { "type": "timestamptz", "nullable": false }
+      }
+    }
+  },
+  "indexes": [
+    "plans.workspace_id",
+    "plan_revisions.plan_id",
+    "tasks.plan_id",
+    "tasks.due_date",
+    "tasks.status",
+    "tasks.tag",
+    "execution_records.task_id",
+    "reviews.plan_id"
+  ],
+  "statusValues": ["todo", "in_progress", "done"],
+  "sorting": {
+    "priority": ["priority ASC", "due_date ASC", "id ASC"],
+    "due_date": ["due_date ASC NULLS LAST", "priority ASC", "id ASC"],
+    "estimated_minutes": ["estimated_minutes ASC", "due_date ASC", "id ASC"],
+    "created_at": ["created_at ASC", "id ASC"]
+  },
+  "aggregationRules": {
+    "timezone": "Asia/Seoul",
+    "excludeDeletedTasks": true,
+    "planTaskCount": "count(tasks where deleted_at is null)",
+    "completedCount": "count(tasks where deleted_at is null and status = done)",
+    "delayedCount": "count(tasks where deleted_at is null and status != done and due_date is before today in Asia/Seoul)",
+    "blockedCount": "count(tasks where deleted_at is null and trim(blocked_reason) != '')",
+    "expectedMinutes": "sum(tasks.estimated_minutes, default 0)",
+    "actualMinutes": "sum(execution_records.actual_minutes, default 0)",
+    "differenceMinutes": "actualMinutes - expectedMinutes",
+    "sourceTaskIds": ["plan", "completed", "delayed", "blocked"]
+  },
+  "seedSafety": {
+    "workspaceSlug": "public",
+    "allowedTables": ["workspaces", "plans", "tasks"],
+    "forbiddenTables": ["execution_records", "plan_revisions", "reviews"],
+    "taskStatus": "todo",
+    "forbidExplicitTimestamps": true,
+    "forbidCompletedTasks": true
+  }
+}
