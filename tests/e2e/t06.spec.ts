@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { expect, test, type Page } from "@playwright/test";
 
 type DashboardResponse = { currentPlan: { id: string; title: string } | null };
@@ -6,9 +7,12 @@ type ExportResponse = { plans: Array<{ id: string; title: string }>; tasks: Arra
 
 const e2eEmail = process.env.E2E_USER_EMAIL;
 const e2ePassword = process.env.E2E_USER_PASSWORD;
-const hasE2EConfig = Boolean(
+const hasSupabaseConfig = Boolean(
   (process.env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.SUPABASE_URL) &&
-  (process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) &&
+  (process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY),
+) || existsSync(".env.local") || existsSync(".env");
+const hasE2EConfig = Boolean(
+  hasSupabaseConfig &&
   e2eEmail &&
   e2ePassword,
 );
