@@ -2,7 +2,25 @@ import { expect, test, type Page } from "@playwright/test";
 
 type DashboardResponse = { currentPlan: { id: string; title: string } | null };
 type TaskResponse = { id: string; title: string };
-type ExportResponse = { plans: Array<{ id: string; title: string }>; tasks: Array<{ id: string; title: string; status: string }>; executionRecords: Array<{ id: string; taskId: string }> };
+type ExportResponse = { plans: Array<{ id: string; title: string }>; tasks: Array<{ id: string; title: string; status: string }>; executionRecords: Array<{ id: string; taskId: string }>; diaryEntries?: Array<{ metricName: string; entryOrigin: string }> };
+
+const e2eEmail = process.env.E2E_USER_EMAIL;
+const e2ePassword = process.env.E2E_USER_PASSWORD;
+const hasE2EConfig = Boolean(
+  (process.env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.SUPABASE_URL) &&
+  (process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) &&
+  e2eEmail &&
+  e2ePassword,
+);
+
+async function login(page: Page): Promise<void> {
+  await page.goto("/login");
+  await page.getByLabel("이메일").fill(e2eEmail ?? "");
+  await page.getByLabel("비밀번호").fill(e2ePassword ?? "");
+  await page.getByRole("button", { name: "로그인" }).click();
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page.getByText("내 작업공간")).toBeVisible();
+}
 
 async function addTask(page: Page, title: string, tag: string): Promise<void> {
   await page.getByRole("button", { name: "할 일 추가" }).click();
@@ -15,12 +33,14 @@ async function addTask(page: Page, title: string, tag: string): Promise<void> {
   await expect(page.getByRole("button", { name: `${title} 완료 기록 열기` })).toBeVisible();
 }
 
-test("T06 public Plan–Do–See data persists safely", async ({ page }) => {
+test.describe("T07 live Supabase integration", () => {
+  test.skip(!hasE2EConfig, "Set Supabase browser env vars and E2E_USER_EMAIL/E2E_USER_PASSWORD for a live test account.");
+
+  test("T07 authenticated Plan–Do–See data persists safely", async ({ page }) => {
   const dialogs: string[] = [];
   page.on("dialog", async (dialog) => { dialogs.push(dialog.message()); await dialog.dismiss(); });
 
-  await page.goto("/");
-  await expect(page.getByText(/로그인 기능이 없습니다/)).toBeVisible();
+  await login(page);
   const initialDashboard = await page.request.get("/api/dashboard");
   expect(initialDashboard.ok()).toBeTruthy();
   const initial = await initialDashboard.json() as DashboardResponse;
@@ -114,4 +134,43 @@ test("T06 public Plan–Do–See data persists safely", async ({ page }) => {
   await page.getByRole("button", { name: "JSON 내보내기" }).first().click();
   expect((await download).suggestedFilename()).toBe("pds-export-v2.json");
   expect(dialogs).toEqual([]);
+  });
+
+  test("T07 authenticated diary keeps five dates and source labels in export", async ({ page }) => {
+
+  await login(page);
+  const metricName = `e2e-diary-${Date.now()}`;
+  const dates = Array.from({ length: 5 }, (_, index) => {
+    const date = new Date(Date.now() - (4 - index) * 86_400_000);
+    return date.toISOString().slice(0, 10);
+  });
+
+  for (const [index, recordDate] of dates.entries()) {
+    const response = await page.request.post("/api/diary", {
+      data: {
+        recordDate,
+        question: "집중 시간을 어떻게 개선했는가?",
+        metricName,
+        unit: "분",
+        value: 42 + index * 5,
+        calculationRule: "실제 집중 작업 시간을 합산한다.",
+        planRuleVersion: index < 2 ? 1 : 2,
+        planRule: index < 2 ? "오전 집중 블록을 지킨다." : "오전·오후 집중 블록을 지킨다.",
+        ruleChangeReason: index < 2 ? null : "오후 블록을 추가했다.",
+      },
+    });
+    expect(response.status()).toBe(201);
+  }
+
+  const exportedResponse = await page.request.get("/api/export");
+  expect(exportedResponse.ok()).toBeTruthy();
+  const exported = await exportedResponse.json() as ExportResponse;
+  const diaryEntries = exported.diaryEntries?.filter((entry) => entry.metricName === metricName) ?? [];
+  expect(diaryEntries).toHaveLength(5);
+  expect(diaryEntries.every((entry) => entry.entryOrigin === "user_entered")).toBeTruthy();
+
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "5일 기록과 계획 규칙" })).toBeVisible();
+  await expect(page.getByText("5일", { exact: true })).toBeVisible();
+  });
 });

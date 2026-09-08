@@ -3,6 +3,7 @@ import type {
   CreatePlanInput,
   CreateReviewInput,
   CreateTaskInput,
+  DiaryEntry,
   ExecutionRecord,
   Plan,
   PlanRevision,
@@ -59,4 +60,10 @@ export interface ReviewRepository {
 /** Server-only boundary for the one public workspace; it never returns raw DB rows. */
 export interface WorkspaceRepository {
   getBySlug(slug: string): Promise<Workspace | null>;
+}
+
+export interface DiaryRepository {
+  listByWorkspace(workspaceId: string): Promise<DiaryEntry[]>;
+  insertMany(workspaceId: string, entries: readonly Omit<DiaryEntry, "id" | "workspaceId" | "createdAt" | "updatedAt">[]): Promise<DiaryEntry[]>;
+  insert(workspaceId: string, entry: Omit<DiaryEntry, "id" | "workspaceId" | "createdAt" | "updatedAt">): Promise<DiaryEntry>;
 }

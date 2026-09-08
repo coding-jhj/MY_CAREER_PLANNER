@@ -69,6 +69,40 @@ export interface Review {
   createdAt: string;
 }
 
+export type DiaryEntryOrigin = "user_entered" | "synthetic_test";
+
+export interface DiaryEntry {
+  id: string;
+  workspaceId: string;
+  recordDate: string;
+  question: string;
+  metricName: string;
+  unit: string;
+  value: number;
+  calculationRule: string;
+  planRuleVersion: number;
+  planRule: string;
+  ruleChangeReason: string | null;
+  entryOrigin: DiaryEntryOrigin;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface DiarySummary {
+  entryCount: number;
+  distinctDates: string[];
+  metricName: string | null;
+  unit: string | null;
+  totalValue: number | null;
+  averageValue: number | null;
+  baselineAverage: number | null;
+  changedAverage: number | null;
+  baselineRuleVersion: number | null;
+  changedRuleVersion: number | null;
+  ruleChangeDate: string | null;
+  ruleChangeReason: string | null;
+}
+
 export interface CreatePlanInput {
   workspaceId: string;
   title: string;
@@ -148,4 +182,6 @@ export interface DashboardData {
   executionRecords: ExecutionRecord[];
   reviews: Review[];
   metrics: ReviewMetrics;
+  diaryEntries: DiaryEntry[];
+  diarySummary: DiarySummary;
 }
