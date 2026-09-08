@@ -47,6 +47,18 @@ describe("public dashboard", () => {
     expect(screen.getByRole("status")).toBeInTheDocument();
   });
 
+  it("switches between planner workspaces without leaving the dashboard", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(dashboard), { status: 200 })));
+    render(<Dashboard />);
+    await waitFor(() => expect(screen.getByRole("heading", { name: "오늘의 커리어 플래너" })).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole("button", { name: "실행 할 일과 기록" }));
+
+    expect(screen.getByRole("heading", { name: "실행" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "실행 목록" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "오늘의 커리어 플래너" })).not.toBeInTheDocument();
+  });
+
   it("uses a sanitized retryable error state", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ error: "internal database credentials" }), { status: 500 })));
     render(<Dashboard />);

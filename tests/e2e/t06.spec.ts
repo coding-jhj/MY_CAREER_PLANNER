@@ -5,6 +5,7 @@ type TaskResponse = { id: string; title: string };
 type ExportResponse = { plans: Array<{ id: string; title: string }>; tasks: Array<{ id: string; title: string; status: string }>; executionRecords: Array<{ id: string; taskId: string }> };
 
 async function addTask(page: Page, title: string, tag: string): Promise<void> {
+  await page.getByRole("button", { name: "할 일 추가" }).click();
   const form = page.getByRole("form", { name: "새 할 일 양식" });
   await form.getByLabel("할 일 제목").fill(title);
   await form.getByLabel("태그").fill(tag);
@@ -26,6 +27,8 @@ test("T06 public Plan–Do–See data persists safely", async ({ page }) => {
   expect(initial.currentPlan).not.toBeNull();
   const originalPlanId = initial.currentPlan!.id;
 
+  await page.getByRole("button", { name: "계획 목표와 기준" }).click();
+  await expect(page.getByRole("heading", { name: "계획" })).toBeVisible();
   await page.getByRole("button", { name: "현재 계획 수정 양식 열기" }).click();
   const planForm = page.getByRole("form", { name: "계획 수정 양식" });
   const revisedTitle = `T06 계획 수정 ${Date.now()}`;
@@ -36,12 +39,15 @@ test("T06 public Plan–Do–See data persists safely", async ({ page }) => {
 
   const suffix = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
   const taskTitles = Array.from({ length: 5 }, (_, index) => `T06 작업 ${index + 1} ${suffix}`);
+  await page.getByRole("button", { name: "실행 할 일과 기록" }).click();
+  await expect(page.getByRole("heading", { name: "실행" })).toBeVisible();
   for (const [index, title] of taskTitles.entries()) await addTask(page, title, index % 2 === 0 ? "t06-search" : "t06-filter");
   const scriptTitle = "<script>alert(1)</script>";
   await addTask(page, scriptTitle, "t06-safety");
   await expect(page.getByText(scriptTitle, { exact: true })).toBeVisible();
   expect(dialogs).toEqual([]);
 
+  await page.locator(".filter-details summary").click();
   const toolbar = page.getByLabel("할 일 검색 및 필터");
   await toolbar.getByLabel("할 일 검색").fill(taskTitles[0]);
   await expect(page.getByText(taskTitles[0], { exact: true })).toBeVisible();
@@ -78,10 +84,13 @@ test("T06 public Plan–Do–See data persists safely", async ({ page }) => {
   await page.getByRole("button", { name: `${completedTitle} 진행 중으로 되돌리기` }).click();
   await expect(page.getByRole("button", { name: "완료 0개 필터 적용" })).toBeVisible();
 
+  await page.getByRole("button", { name: "회고 결과와 다음 계획" }).click();
+  await expect(page.getByRole("heading", { name: "회고" })).toBeVisible();
   await page.getByRole("button", { name: /^계획 .* 원본 할 일 보기$/ }).click();
   await expect(page.getByText("돌아보기 지표 원본만 표시")).toBeVisible();
   await expect(page.getByText(completedTitle, { exact: true })).toBeVisible();
 
+  await page.locator(".correction-details summary").click();
   const correctionForm = page.getByRole("form", { name: "개선점 다음 계획 반영" });
   const nextTitle = `T06 다음 계획 ${suffix}`;
   await correctionForm.getByLabel("개선점").fill("실제 기록을 바탕으로 다음 계획의 시간을 조정한다.");
@@ -102,7 +111,7 @@ test("T06 public Plan–Do–See data persists safely", async ({ page }) => {
   expect(persistedExport.executionRecords.filter((record) => record.taskId === completedTask!.id)).toHaveLength(1);
 
   const download = page.waitForEvent("download");
-  await page.getByRole("button", { name: "JSON 내보내기" }).click();
+  await page.getByRole("button", { name: "JSON 내보내기" }).first().click();
   expect((await download).suggestedFilename()).toBe("pds-export-v2.json");
   expect(dialogs).toEqual([]);
 });
