@@ -71,7 +71,7 @@ T07부터는 Supabase Auth 기반의 개인 작업공간으로 동작합니다.
 - 이메일 회원가입·로그인·로그아웃
 - 로그인하지 않은 사용자는 대시보드와 보호 API에 접근할 수 없음
 - workspace 소유권과 PostgreSQL RLS로 계정별 기록을 분리
-- service role 키는 서버에서만 사용하고 브라우저에는 전달하지 않음
+- 서버용 secret 키는 서버에서만 사용하고 브라우저에는 전달하지 않음
 - 계정 삭제 시 소유 workspace와 연결된 기록은 함께 삭제됨
 - 회사 지원 자동 제출·AI 자동 첨삭 기능은 포함하지 않음
 - 비밀번호 원문·API 키·비공개 지원서 원문은 애플리케이션 테이블에 저장하지 않음
@@ -102,7 +102,7 @@ T07부터는 Supabase Auth 기반의 개인 작업공간으로 동작합니다.
 브라우저
     ↓ Supabase Auth 쿠키 세션
 Next.js 화면 + 인증된 Route Handler
-    ↓ publishable key + RLS / 서버 전용 service role
+    ↓ publishable key + RLS / 서버 전용 secret key
 Supabase Auth + PostgreSQL
 ```
 

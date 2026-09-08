@@ -67,8 +67,8 @@ cascade behavior.
 
 ## Security notes
 
-- `SUPABASE_SERVICE_ROLE_KEY` is server-only and must never use a `NEXT_PUBLIC_`
-  prefix.
+- `SUPABASE_SECRET_KEY` is the preferred server-only key and must never use a
+  `NEXT_PUBLIC_` prefix. `SUPABASE_SERVICE_ROLE_KEY` remains a legacy fallback.
 - Browser code uses the publishable key with RLS.
 - No authorization decision uses editable `user_metadata`.
 - Anonymous access is not granted to application tables or transaction RPCs.

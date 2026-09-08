@@ -8,15 +8,15 @@ export { ConfigurationError };
 
 export function createServiceRoleSupabaseClient(): SupabaseClient {
   const url = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const serverKey = process.env.SUPABASE_SECRET_KEY ?? process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-  if (!url || !serviceRoleKey) {
+  if (!url || !serverKey) {
     throw new ConfigurationError(
-      "SUPABASE_URL (or NEXT_PUBLIC_SUPABASE_URL) and SUPABASE_SERVICE_ROLE_KEY must be configured on the server",
+      "SUPABASE_URL (or NEXT_PUBLIC_SUPABASE_URL) and SUPABASE_SECRET_KEY (or SUPABASE_SERVICE_ROLE_KEY) must be configured on the server",
     );
   }
 
-  return createClient(url, serviceRoleKey, {
+  return createClient(url, serverKey, {
     auth: {
       autoRefreshToken: false,
       persistSession: false,
