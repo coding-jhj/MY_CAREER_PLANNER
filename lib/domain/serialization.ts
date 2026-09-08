@@ -1,4 +1,4 @@
-import type { ExecutionRecord, Plan, PlanRevision, Review, Task, Workspace } from "./types";
+import type { DiaryEntry, ExecutionRecord, Plan, PlanRevision, Review, Task, Workspace } from "./types";
 
 export interface ExportInput {
   workspace: Workspace;
@@ -7,12 +7,13 @@ export interface ExportInput {
   tasks: readonly Task[];
   executionRecords: readonly ExecutionRecord[];
   reviews: readonly Review[];
+  diaryEntries?: readonly DiaryEntry[];
   exportedAt: string;
 }
 
 /** Constructs a fresh export document from the public schema allowlist only. */
 export function serializeExport(input: ExportInput): Record<string, unknown> {
-  return {
+  const output: Record<string, unknown> = {
     schemaVersion: "pds-schema-v2",
     exportedAt: input.exportedAt,
     workspace: pickWorkspace(input.workspace),
@@ -22,6 +23,8 @@ export function serializeExport(input: ExportInput): Record<string, unknown> {
     executionRecords: input.executionRecords.map(pickExecutionRecord),
     reviews: input.reviews.map(pickReview),
   };
+  if (input.diaryEntries !== undefined) output.diaryEntries = input.diaryEntries.map(pickDiaryEntry);
+  return output;
 }
 
 function pickWorkspace(value: Workspace) { return { id: value.id, slug: value.slug, title: value.title, timezone: value.timezone, createdAt: value.createdAt }; }
@@ -30,3 +33,4 @@ function pickPlanRevision(value: PlanRevision) { return { id: value.id, workspac
 function pickTask(value: Task) { return { id: value.id, planId: value.planId, title: value.title, dueDate: value.dueDate, priority: value.priority, tag: value.tag, estimatedMinutes: value.estimatedMinutes, status: value.status, blockedReason: value.blockedReason, completedAt: value.completedAt, deletedAt: value.deletedAt, createdAt: value.createdAt, updatedAt: value.updatedAt }; }
 function pickExecutionRecord(value: ExecutionRecord) { return { id: value.id, taskId: value.taskId, startedAt: value.startedAt, endedAt: value.endedAt, actualMinutes: value.actualMinutes, missedReason: value.missedReason, idempotencyKey: value.idempotencyKey, createdAt: value.createdAt }; }
 function pickReview(value: Review) { return { id: value.id, planId: value.planId, correctionText: value.correctionText, nextPlanId: value.nextPlanId, createdAt: value.createdAt }; }
+function pickDiaryEntry(value: DiaryEntry) { return { id: value.id, workspaceId: value.workspaceId, recordDate: value.recordDate, question: value.question, metricName: value.metricName, unit: value.unit, value: value.value, calculationRule: value.calculationRule, planRuleVersion: value.planRuleVersion, planRule: value.planRule, ruleChangeReason: value.ruleChangeReason, entryOrigin: value.entryOrigin, createdAt: value.createdAt, updatedAt: value.updatedAt }; }

@@ -1,11 +1,12 @@
 import { z } from "zod";
 
 import { calculateReviewMetrics } from "../../domain/metrics";
+import { calculateDiarySummary } from "../../domain/diary";
 import { serializeExport } from "../../domain/serialization";
 import { parseCreatePlanInput, requireNonEmptyId } from "../../domain/validation";
 import type { CreatePlanInput, DashboardData, Plan, Review, ReviewMetrics } from "../../domain/types";
 import { NotFoundError, ValidationError } from "../errors";
-import type { ExecutionRepository, PlanRepository, ReviewRepository, TaskRepository, WorkspaceRepository } from "../repositories/contracts";
+import type { DiaryRepository, ExecutionRepository, PlanRepository, ReviewRepository, TaskRepository, WorkspaceRepository } from "../repositories/contracts";
 
 export type ReviewData = { metrics: ReviewMetrics; reviews: Review[] };
 export type CorrectionResult = { review: Review; nextPlan: Plan | null };
@@ -82,16 +83,18 @@ export async function getDashboardData(
   reviewRepository: ReviewRepository,
   workspaceSlug = "public",
   today: string = currentSeoulDate(),
+  diaryRepository?: DiaryRepository,
 ): Promise<DashboardData | null> {
   const workspace = await workspaceRepository.getBySlug(workspaceSlug);
   if (!workspace) return null;
+  const diaryEntries = diaryRepository ? await diaryRepository.listByWorkspace(workspace.id) : [];
   const currentPlan = await planRepository.getCurrent(workspace.id);
   if (!currentPlan) {
-    return { workspace, currentPlan: null, tasks: [], executionRecords: [], reviews: [], metrics: calculateReviewMetrics([], [], today) };
+    return { workspace, currentPlan: null, tasks: [], executionRecords: [], reviews: [], metrics: calculateReviewMetrics([], [], today), diaryEntries, diarySummary: calculateDiarySummary(diaryEntries) };
   }
   const { tasks, executionRecords } = await planRecords(taskRepository, executionRepository, currentPlan.id);
   const reviews = await reviewRepository.listByPlan(currentPlan.id);
-  return { workspace, currentPlan, tasks, executionRecords, reviews, metrics: calculateReviewMetrics(tasks, executionRecords, today) };
+  return { workspace, currentPlan, tasks, executionRecords, reviews, metrics: calculateReviewMetrics(tasks, executionRecords, today), diaryEntries, diarySummary: calculateDiarySummary(diaryEntries) };
 }
 
 export async function saveCorrection(
@@ -122,9 +125,11 @@ export async function getExportData(
   executionRepository: ExecutionRepository,
   reviewRepository: ReviewRepository,
   exportedAt = new Date().toISOString(),
+  diaryRepository?: DiaryRepository,
 ): Promise<Record<string, unknown> | null> {
   const workspace = await workspaceRepository.getBySlug("public");
   if (!workspace) return null;
+  const diaryEntries = diaryRepository ? await diaryRepository.listByWorkspace(workspace.id) : [];
   const plans = await planRepository.listByWorkspace(workspace.id);
   const records = await Promise.all(plans.map(async (plan) => {
     const tasks = await taskRepository.list(plan.id, { includeDeleted: false });
@@ -142,6 +147,7 @@ export async function getExportData(
     tasks: records.flatMap((record) => record.tasks),
     executionRecords: records.flatMap((record) => record.executionRecords),
     reviews: records.flatMap((record) => record.reviews),
+    diaryEntries,
     exportedAt,
   });
 }

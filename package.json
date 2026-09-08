@@ -11,6 +11,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
+    "verify:schema": "node --experimental-strip-types scripts/verify-schema.ts",
     "verify": "npm run typecheck && npm run lint && npm test && npm run build"
   },
   "keywords": [],
@@ -19,6 +20,7 @@
   "type": "module",
   "dependencies": {
     "@phosphor-icons/react": "^2.1.10",
+    "@supabase/ssr": "0.12.7",
     "@supabase/supabase-js": "^2.115.0",
     "next": "^16.3.4",
     "react": "^19.2.8",

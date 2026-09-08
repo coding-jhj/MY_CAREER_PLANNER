@@ -28,6 +28,8 @@ import { PublicNotice } from "../shared/PublicNotice";
 import { MetricButton } from "./MetricButton";
 import { ReviewPanel } from "../review/ReviewPanel";
 import { ExportButton } from "../export/ExportButton";
+import { LogoutButton } from "../auth/LogoutButton";
+import { DiarySummaryPanel } from "./DiarySummaryPanel";
 
 type MetricKey = "plan" | "completed" | "delayed" | "blocked";
 type ViewKey = "today" | "plan" | "execute" | "review";
@@ -98,7 +100,7 @@ function RealDataChecklist({ data }: { data: DashboardData }) {
         <strong>{completeCount}/3 확인</strong>
       </summary>
       <div className="data-health-body">
-        <p>현재 대시보드에 저장된 실제 데이터만 표시합니다.</p>
+        <p>현재 대시보드에 저장된 계획·실행 기록을 표시합니다.</p>
         <ul className="setup-checklist-list">
           {items.map(([label, complete]) => (
             <li key={label} className={complete ? "is-complete" : "is-pending"}>
@@ -165,7 +167,7 @@ function AgendaList({ tasks, onOpenExecute }: { tasks: Task[]; onOpenExecute: ()
   );
 }
 
-function TodayView({ data, metric, onMetric, onNavigate }: { data: DashboardData; metric: MetricKey | null; onMetric: (key: MetricKey) => void; onNavigate: (view: ViewKey) => void }) {
+function TodayView({ data, metric, onMetric, onNavigate, onRefresh }: { data: DashboardData; metric: MetricKey | null; onMetric: (key: MetricKey) => void; onNavigate: (view: ViewKey) => void; onRefresh: () => Promise<void> }) {
   const focusTask = getFocusTask(data.tasks);
   const progress = data.tasks.length ? Math.round((data.metrics.completedCount / data.tasks.length) * 100) : 0;
   const daysToReview = daysUntil(data.currentPlan?.endDate);
@@ -204,6 +206,8 @@ function TodayView({ data, metric, onMetric, onNavigate }: { data: DashboardData
 
       <AgendaList tasks={data.tasks} onOpenExecute={() => onNavigate("execute")} />
 
+      <DiarySummaryPanel data={data} onRefresh={onRefresh} />
+
       <section className="today-secondary-grid" aria-label="다음 행동과 장기 목표">
         <article className="next-review-module">
           <div className="module-heading"><div><span className="section-kicker">NEXT REVIEW</span><h2>다음 계획 점검</h2></div><CalendarBlank className="module-heading-icon" aria-hidden="true" /></div>
@@ -238,7 +242,7 @@ function ReviewView({ data, refreshDashboard, onError, reviewTaskIds, onDrillDow
   return <div className="workspace-view review-view"><div className="workspace-grid workspace-grid--review"><ReviewPanel plan={data.currentPlan} workspaceId={data.workspace.id} tasks={data.tasks} refreshDashboard={refreshDashboard} onDrillDown={onDrillDown} />{reviewTaskIds && <TaskPanel planId={data.currentPlan?.id ?? null} tasks={data.tasks} refreshDashboard={refreshDashboard} onError={onError} metricTaskIds={reviewTaskIds} compact />}</div></div>;
 }
 
-export function Dashboard() {
+export function Dashboard({ userEmail = null }: { userEmail?: string | null } = {}) {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -291,8 +295,8 @@ export function Dashboard() {
           <span className="brand-mark" aria-hidden="true"><Sparkle weight="fill" /></span>
           <span className="brand-copy"><strong>MY CAREER PLANNER</strong><small>career OS</small></span>
         </button>
-        <div className="header-context"><span className="header-context-dot" aria-hidden="true" /><span>공개 작업공간</span><span className="header-context-separator">·</span><span>나의 기록을 쌓는 중</span></div>
-        <div className="header-actions"><ExportButton /><span className="avatar" aria-hidden="true"><UserCircle weight="fill" /></span></div>
+        <div className="header-context"><span className="header-context-dot" aria-hidden="true" /><span>내 작업공간</span><span className="header-context-separator">·</span><span>{userEmail ?? "로그인 필요"}</span></div>
+        <div className="header-actions"><ExportButton />{userEmail && <LogoutButton />}<span className="avatar" aria-hidden="true"><UserCircle weight="fill" /></span></div>
       </header>
 
       <div className="planner-frame">
@@ -301,15 +305,15 @@ export function Dashboard() {
           <nav className="sidebar-nav">
             {navigation.map(({ key, label, description, icon: Icon }) => <button key={key} className={activeView === key ? "is-active" : ""} type="button" onClick={() => navigate(key)} aria-label={`${label} ${description}`} aria-current={activeView === key ? "page" : undefined}><span className="sidebar-nav-icon"><Icon weight={activeView === key ? "fill" : "regular"} aria-hidden="true" /></span><span><strong>{label}</strong><small>{description}</small></span></button>)}
           </nav>
-          <div className="sidebar-bottom"><div className="sidebar-status"><Circle weight="fill" aria-hidden="true" /><span>공개 작업공간</span></div><p>로그인 없이 사용하는<br />개인 커리어 기록장</p></div>
+          <div className="sidebar-bottom"><div className="sidebar-status"><Circle weight="fill" aria-hidden="true" /><span>개인 작업공간</span></div><p>로그인한 계정에서만<br />나의 기록을 관리해요.</p></div>
         </aside>
 
         <main className="planner-main">
           <div className="page-heading"><div><span className="section-kicker">{page.kicker}</span><h1>{page.title}</h1><p>{page.description}</p></div><div className="page-heading-date"><CalendarBlank aria-hidden="true" /><span>{formatToday()}</span></div></div>
-          {activeView === "today" && <PublicNotice />}
+          {!userEmail && activeView === "today" && <PublicNotice />}
           {loading && <LoadingState />}
           {error && <ErrorMessage onRetry={() => void refreshDashboard()} />}
-          {data && activeView === "today" && <TodayView data={data} metric={metric} onMetric={selectMetric} onNavigate={navigate} />}
+          {data && activeView === "today" && <TodayView data={data} metric={metric} onMetric={selectMetric} onNavigate={navigate} onRefresh={refreshDashboard} />}
           {data && activeView === "plan" && <PlanView data={data} refreshDashboard={refreshDashboard} onError={showError} />}
           {data && activeView === "execute" && <ExecuteView data={data} refreshDashboard={refreshDashboard} onError={showError} metricTaskIds={metricIds} />}
           {data && activeView === "review" && <ReviewView data={data} refreshDashboard={refreshDashboard} onError={showError} reviewTaskIds={reviewTaskIds} onDrillDown={handleReviewDrillDown} />}

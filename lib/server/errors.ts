@@ -5,6 +5,13 @@ export class ConfigurationError extends Error {
   }
 }
 
+export class UnauthorizedError extends Error {
+  constructor(message = "Authentication is required") {
+    super(message);
+    this.name = "UnauthorizedError";
+  }
+}
+
 export class NotFoundError extends Error {
   constructor(message: string) {
     super(message);
@@ -47,6 +54,7 @@ interface SupabaseErrorShape {
 
 export function translateSupabaseError(error: SupabaseErrorShape):
   | ConflictError
+  | UnauthorizedError
   | NotFoundError
   | ValidationError
   | DatabaseError {
@@ -69,6 +77,10 @@ export function translateSupabaseError(error: SupabaseErrorShape):
 
   if (error.code === "23514" || error.code === "22P02") {
     return new ValidationError("Invalid database input");
+  }
+
+  if (error.code === "42501" || error.code === "PGRST301") {
+    return new UnauthorizedError();
   }
 
   if (error.code === "PGRST116" || error.code === "P0002") {

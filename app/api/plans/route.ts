@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 
-import { createServerSupabaseClient } from "../../../lib/server/db";
+import { getAuthenticatedContext } from "../../../lib/server/auth";
 import {
   DatabaseError,
   NotFoundError,
+  UnauthorizedError,
   ValidationError,
 } from "../../../lib/server/errors";
 import { SupabasePlanRepository } from "../../../lib/server/repositories/plan-repository";
@@ -19,6 +20,7 @@ function errorResponse(error: unknown): NextResponse {
   if (error instanceof NotFoundError) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
+  if (error instanceof UnauthorizedError) return NextResponse.json({ error: "Authentication required" }, { status: 401 });
   if (error instanceof DatabaseError) {
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
@@ -32,7 +34,8 @@ export async function POST(request: Request): Promise<NextResponse> {
         body: ["Request body must be valid JSON"],
       });
     });
-    const repository = new SupabasePlanRepository(createServerSupabaseClient());
+    const { client } = await getAuthenticatedContext();
+    const repository = new SupabasePlanRepository(client);
     const plan = await createPlan(repository, body);
     return NextResponse.json(plan, { status: 201 });
   } catch (error) {
